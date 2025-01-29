@@ -211,6 +211,10 @@ func (b *Backoff) Retry(ctx context.Context, op Op, options ...RetryOption) erro
 			return err
 		}
 
+		if b.policy.MaxAttempts > 0 && r.Attempt >= b.policy.MaxAttempts {
+			return fmt.Errorf("exceeded max attempts: %w: %w", r.Err, ErrPermanent)
+		}
+
 		// Check to see if the error contained an interval that is longer
 		// than the exponential retry timer. If it is, we will use the error
 		// retry timer.
@@ -283,6 +287,9 @@ func (b *Backoff) randomize(interval time.Duration) time.Duration {
 	min := interval - time.Duration(delta)
 	max := interval + time.Duration(delta)
 
+	if max-min <= 0 {
+		return time.Duration(min)
+	}
 	// Get a random number in the range. So if RandomizationFactor is 0.5, and interval is 1s,
 	// then we will get a random number between 0.5s and 1.5s.
 	return time.Duration(rand.Int63n(int64(max-min))) + min // #nosec

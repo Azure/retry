@@ -360,6 +360,7 @@ func TestRetry(t *testing.T) {
 			},
 			newErr: true,
 		},
+
 		{
 			name:     "Success on first attempt",
 			failures: Failures{},
@@ -433,6 +434,35 @@ func TestRetry(t *testing.T) {
 			wantClockMin: time.Time{}.Add(1 * time.Minute).Add(21 * time.Second).Add(15000 * time.Millisecond),
 			wantClockMax: time.Time{}.Add(4 * time.Minute).Add(3 * time.Second).Add(45000 * time.Millisecond),
 		},
+		{
+			name: "Permanent error on second attempt due to MaxAttempts",
+			options: []Option{
+				WithPolicy(
+					Policy{
+						InitialInterval:     1,
+						Multiplier:          1.1,
+						RandomizationFactor: 0.1,
+						MaxInterval:         10 * time.Second,
+						MaxAttempts:         2,
+					},
+				),
+			},
+			failures:          Failures{errors: []error{nonPermErr, nonPermErr}},
+			dataWant:          RetryData{},
+			retryErr:          true,
+			retryErrPermanent: true,
+			recCheck: NewRecordCheck(
+				Policy{
+					InitialInterval:     1,
+					Multiplier:          1.1,
+					RandomizationFactor: 0.1,
+					MaxInterval:         10 * time.Second,
+					MaxAttempts:         2,
+				},
+				// Even though a permanent error is returned, op never sees it because we never get back
+				// to op after the second failure.
+				2).AddErr(nonPermErr),
+		},
 	}
 
 	for _, test := range tests {
@@ -494,6 +524,11 @@ func TestRetry(t *testing.T) {
 			}
 			if isContextCanceled(err) != test.retryIsCanceled {
 				t.Errorf("TestRetry(%s): returned Error.IsCancelled() == %v, want %v", test.name, isContextCanceled(err), test.retryIsCanceled)
+			}
+			if !test.recCheck.IsZero() {
+				if err := test.recCheck.Check(finalRec); err != nil {
+					t.Errorf("TestRetry(%s): final record check had error: %v", test.name, err)
+				}
 			}
 			return
 		}

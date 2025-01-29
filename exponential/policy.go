@@ -35,6 +35,9 @@ type Policy struct {
 	// MaxInterval is the maximum amount of time to wait between retries. Must be > 0.
 	// Defaults to 60s.
 	MaxInterval time.Duration
+	// MaxAttempts is the maximum number of attempts to make before giving up. If 0, then there is no limit.
+	// Defaults to 0. When this occurs, the error returned will contain ErrPermanent.
+	MaxAttempts int
 }
 
 func (p Policy) validate() error {
