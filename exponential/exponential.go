@@ -119,7 +119,7 @@ func WithErrTransformer(transformers ...ErrTransformer) Option {
 // New creates a new Backoff instance with the given options.
 func New(options ...Option) (*Backoff, error) {
 	b := &Backoff{
-		policy: defaults(),
+		policy: FastRetryPolicy(),
 	}
 
 	for _, o := range options {

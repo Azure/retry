@@ -160,7 +160,7 @@ func TestPolicyValidate(t *testing.T) {
 		},
 		{
 			name:   "Default policy must be valid",
-			policy: defaults(),
+			policy: FastRetryPolicy(),
 			want:   nil,
 		},
 	}
@@ -203,19 +203,19 @@ func TestPolicyTimetable(t *testing.T) {
 	}{
 		{
 			name:    "Attempt -1: All attempts until we hit max interval",
-			policy:  defaults(),
+			policy:  FastRetryPolicy(),
 			attempt: -1,
 			want:    defaultTimeTable, // in file default_timetable_test.go
 		},
 		{
 			name:    "Attempt 0: Only our first attempt",
-			policy:  defaults(),
+			policy:  FastRetryPolicy(),
 			attempt: 0,
 			want:    zerott,
 		},
 		{
 			name:    "Attempt 3: Only our first 3 attempts",
-			policy:  defaults(),
+			policy:  FastRetryPolicy(),
 			attempt: 3,
 			want:    _3tt,
 		},
@@ -234,8 +234,8 @@ func TestPolicyTimetable(t *testing.T) {
 	}
 }
 
-// TestDefaults tests that we get the expected default values for the Policy struct.
-func TestDefaults(t *testing.T) {
+// TestFastRetryPolicy tests that we get the expected default values for the Policy struct.
+func TestFastRetryPolicy(t *testing.T) {
 	t.Parallel()
 
 	want := Policy{
@@ -249,10 +249,10 @@ func TestDefaults(t *testing.T) {
 		PrintStringers: true,
 	}
 
-	got := defaults()
+	got := FastRetryPolicy()
 
 	if diff := conf.Compare(got, want); diff != "" {
-		t.Errorf("defaults(): -got +want: %v", diff)
+		t.Errorf("FastRetryPolicy(): -got +want: %v", diff)
 	}
 }
 
@@ -365,7 +365,7 @@ func TestRetry(t *testing.T) {
 			name:     "Success on first attempt",
 			failures: Failures{},
 			dataWant: RetryData{SuccessOn: 1},
-			recCheck: NewRecordCheck(defaults(), 1),
+			recCheck: NewRecordCheck(FastRetryPolicy(), 1),
 		},
 		{
 			name:              "Permanent error on first attempt",
@@ -373,7 +373,7 @@ func TestRetry(t *testing.T) {
 			dataWant:          RetryData{},
 			retryErr:          true,
 			retryErrPermanent: true,
-			recCheck:          NewRecordCheck(defaults(), 1).AddErr(ErrPermanent),
+			recCheck:          NewRecordCheck(FastRetryPolicy(), 1).AddErr(ErrPermanent),
 		},
 		{
 			name:              "Permanent error on second attempt",
@@ -381,7 +381,7 @@ func TestRetry(t *testing.T) {
 			dataWant:          RetryData{},
 			retryErr:          true,
 			retryErrPermanent: true,
-			recCheck:          NewRecordCheck(defaults(), 2).AddErr(ErrPermanent),
+			recCheck:          NewRecordCheck(FastRetryPolicy(), 2).AddErr(ErrPermanent),
 		},
 		{
 			name: "Context deadlines after 1 second",
@@ -586,7 +586,7 @@ func TestRandomize(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			b := &Backoff{policy: defaults()}
+			b := &Backoff{policy: FastRetryPolicy()}
 			b.policy.RandomizationFactor = test.randomizationFactor
 			got := b.randomize(test.interval)
 			if got < test.minValue || got > test.maxValue {
@@ -603,7 +603,7 @@ func TestEnsureRandomization(t *testing.T) {
 
 	seen := map[time.Duration]bool{}
 
-	b := &Backoff{policy: defaults()}
+	b := &Backoff{policy: FastRetryPolicy()}
 	for i := 0; i < 100; i++ {
 		got := b.randomize(1 * time.Second)
 		if seen[got] {
@@ -647,7 +647,7 @@ func TestRetryAfterInterval(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		b := &Backoff{policy: defaults(), clock: &testClock{}}
+		b := &Backoff{policy: FastRetryPolicy(), clock: &testClock{}}
 		got := b.errHasRetryInterval(test.err)
 		if got != test.want {
 			t.Errorf("TestRetryAfterInterval(%s): got %v, want %v", test.name, got, test.want)
