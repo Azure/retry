@@ -182,19 +182,44 @@ type Op func(context.Context, Record) error
 
 // RetryOption is an option for the Retry method. Functions that implement RetryOption
 // provide an override on a single call.
-type RetryOption func(o *retryOptions) error
+type RetryOption func(o retryOptions) (retryOptions, error)
 
 // retryOptions provides override options on a single Retry() call. Currently empty, but provided
 // for future extensibility without breaking the API.
-type retryOptions struct{}
+type retryOptions struct {
+	maxAttempts int
+}
+
+// WithMaxAttempts sets the maximum number of attempts to retry the operation. If not specified,
+// the maximum number of attempts is determined by the policy. If the policy has a MaxAttempts
+// greater than 0, that is used. If the policy has a MaxAttempts of 0, then there is no limit.
+func WithMaxAttempts(max int) RetryOption {
+	return func(o retryOptions) (retryOptions, error) {
+		if max <= 0 {
+			return o, fmt.Errorf("max attempts must be greater than 0, got %d", max)
+		}
+		o.maxAttempts = max
+		return o, nil
+	}
+}
 
 // Retry will retry the given operation until it succeeds, the context is cancelled or an error
 // is returned with PermanentErr(). This is safe to call concurrently.
 func (b *Backoff) Retry(ctx context.Context, op Op, options ...RetryOption) error {
+	opts := retryOptions{
+		b.policy.MaxAttempts,
+	}
+	var err error
+	for _, o := range options {
+		if opts, err = o(opts); err != nil {
+			return fmt.Errorf("invalid retry option: %w", err)
+		}
+	}
+
 	r := Record{Attempt: 1}
 
 	// Make our first attempt.
-	err := op(ctx, r)
+	err = op(ctx, r)
 	if err == nil {
 		return nil
 	}
@@ -211,7 +236,7 @@ func (b *Backoff) Retry(ctx context.Context, op Op, options ...RetryOption) erro
 			return err
 		}
 
-		if b.policy.MaxAttempts > 0 && r.Attempt >= b.policy.MaxAttempts {
+		if opts.maxAttempts > 0 && r.Attempt >= opts.maxAttempts {
 			return fmt.Errorf("exceeded max attempts: %w: %w", r.Err, ErrPermanent)
 		}
 
@@ -255,9 +280,7 @@ func (b *Backoff) Retry(ctx context.Context, op Op, options ...RetryOption) erro
 		// Create our new base interval for the next attempt.
 		baseInterval = time.Duration(float64(baseInterval) * b.policy.Multiplier)
 		// Our base interval cannot exceed the maximum interval.
-		if baseInterval > b.policy.MaxInterval {
-			baseInterval = b.policy.MaxInterval
-		}
+		baseInterval = min(baseInterval, b.policy.MaxInterval)
 		// Randomize the interval based on our randomization factor.
 		realInterval = b.randomize(baseInterval)
 	}
