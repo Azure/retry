@@ -134,6 +134,16 @@ func New(options ...Option) (*Backoff, error) {
 	return b, nil
 }
 
+// Must creates a new Backoff instance with the given options and panics if there is an error.
+// Use: Must(New(options)) .
+func Must(n func(options ...Option) (*Backoff, error)) *Backoff {
+	b, err := n()
+	if err != nil {
+		panic(fmt.Sprintf("backoff could not be created: %s", err))
+	}
+	return b
+}
+
 // Record is the record of a Retry attempt.
 type Record struct {
 	// Attempt is the number of attempts (initial + retries). A zero value of Record has Attempt == 0.
