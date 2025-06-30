@@ -211,9 +211,7 @@ func (p Policy) timeTable() TimeTable {
 		tt.Entries = append(tt.Entries, entry)
 
 		interval = time.Duration(float64(interval) * p.Multiplier)
-		if interval > p.MaxInterval {
-			interval = p.MaxInterval
-		}
+		interval = min(interval, p.MaxInterval)
 	}
 
 	// This is the final entry at the maximum interval.
@@ -230,15 +228,45 @@ func (p Policy) timeTable() TimeTable {
 	return tt
 }
 
-// defaults creates a new Policy with the default values.
-func defaults() Policy {
-	// progression will be:
-	// 100ms, 200ms, 400ms, 800ms, 1.6s, 3.2s, 6.4s, 12.8s, 25.6s, 51.2s, 60s
-	// Not counting a randomization factor which will be +/- up to 50% of the interval.
+// FastRetryPolicy returns a retry plan that is fast at first and then slows down. This is the default policy.
+//
+// progression will be:
+// 100ms, 200ms, 400ms, 800ms, 1.6s, 3.2s, 6.4s, 12.8s, 25.6s, 51.2s, 60s
+// Not counting a randomization factor which will be +/- up to 50% of the interval.
+func FastRetryPolicy() Policy {
 	return Policy{
 		InitialInterval:     100 * time.Millisecond,
 		Multiplier:          2,
 		RandomizationFactor: 0.5,
 		MaxInterval:         60 * time.Second,
+	}
+}
+
+// SecondsRetryPolicy returns a retry plan that moves in 1 second intervals up to 60 seconds.
+//
+// progression will be:
+// 1s, 2s, 4s, 8s, 16s, 32s, 60s
+// Not counting a randomization factor which will be +/- up to 50% of the interval.
+func SecondsRetryPolicy() Policy {
+	return Policy{
+		InitialInterval:     1 * time.Second,
+		Multiplier:          2,
+		RandomizationFactor: 0.5,
+		MaxInterval:         60 * time.Second,
+	}
+}
+
+// ThirtySecondsRetryPolicy returns a retry plan that moves in 30 second intervals up to 5 minutes.
+//
+// progression will be:
+// 30s, 33s, 36s, 40s, 44s, 48s, 53s, 58s, 64s, 70s, 77s, 85s, 94s, 103s, 113s, 124s, 136s, 150s,
+// 165s, 181s, 199s, 219s, 241s, 265s, 292s, 300s
+// Not counting a randomization factor which will be +/- up to 20% of the interval.
+func ThirtySecondsRetryPolicy() Policy {
+	return Policy{
+		InitialInterval:     30 * time.Second,
+		Multiplier:          1.1,
+		RandomizationFactor: 0.2,
+		MaxInterval:         5 * time.Minute,
 	}
 }
