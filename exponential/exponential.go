@@ -134,12 +134,11 @@ func New(options ...Option) (*Backoff, error) {
 	return b, nil
 }
 
-// Must creates a new Backoff instance with the given options and panics if there is an error.
+// Must returns b if err == nil, otherwise it panics.
 // Use: Must(New(options)) .
-func Must(n func(options ...Option) (*Backoff, error)) *Backoff {
-	b, err := n()
+func Must(b *Backoff, err error) *Backoff {
 	if err != nil {
-		panic(fmt.Sprintf("backoff could not be created: %s", err))
+		panic(err)
 	}
 	return b
 }
