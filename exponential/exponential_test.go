@@ -89,6 +89,10 @@ func (c *testClock) NewTimer(d time.Duration) *timer {
 	return t
 }
 
+func TestMust(t *testing.T) {
+	_ = Must(New())
+}
+
 // TestPolicyValidate tests that the Policy.validate() correctly validates the struct.
 func TestPolicyValidate(t *testing.T) {
 	t.Parallel()
