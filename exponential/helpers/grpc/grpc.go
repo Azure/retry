@@ -200,7 +200,8 @@ func (t *Transformer) isGRPCPermanent(code codes.Code) bool {
 
 // RespToErr takes a proto.Message and an error from a call from a protocol buffer client call method and
 // returns the Response and an error. If error != nil , this simply return the values passed. Otherwise it will inspect the
-// Response accord to rules passed to New() to determine if we have an error.
+// Response accord to rules passed to New() to determine if we have an error. It will always execute
+// all error ProtoToErr(s) unless the error returned is wrapped with ErrPermanent.
 func (t *Transformer) RespToErr(r proto.Message, err error) (proto.Message, error) {
 	if len(t.protosToErrs) == 0 {
 		return r, err
@@ -208,12 +209,21 @@ func (t *Transformer) RespToErr(r proto.Message, err error) (proto.Message, erro
 	if err != nil {
 		return r, err
 	}
+
+	var retErr error
 	for _, respToErr := range t.protosToErrs {
+		wasPermanent := false
 		if err = respToErr(r); err != nil {
-			if errors.Is(err, errors.ErrPermanent) {
-				return r, err
+			wasPermanent = errors.Is(err, errors.ErrPermanent)
+			if retErr == nil {
+				retErr = err
+			} else {
+				retErr = fmt.Errorf("%w: %w", retErr, err)
+			}
+			if wasPermanent {
+				break
 			}
 		}
 	}
-	return r, err
+	return r, retErr
 }

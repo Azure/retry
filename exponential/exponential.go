@@ -257,7 +257,7 @@ func (b *Backoff) Retry(ctx context.Context, op Op, options ...RetryOption) erro
 		// If our context is done or our interval goes over the context deadline,
 		// then we are done.
 		if !b.ctxOK(ctx, realInterval) {
-			return fmt.Errorf("r.Err: %w", ErrRetryCanceled)
+			return fmt.Errorf("%w: %w", r.Err, ErrRetryCanceled)
 		}
 
 		// Do this if they did not pass the WithTesting() option.

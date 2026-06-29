@@ -5,6 +5,7 @@ go 1.23.0
 toolchain go1.24.2
 
 require (
+	github.com/google/go-cmp v0.7.0
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/kylelemons/godebug v1.1.0
 	github.com/sanity-io/litter v1.5.8
@@ -14,7 +15,6 @@ require (
 )
 
 require (
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	golang.org/x/sys v0.33.0 // indirect
