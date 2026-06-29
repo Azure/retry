@@ -5,9 +5,14 @@ import (
 	"testing"
 
 	"github.com/Azure/retry/internal/errors"
+	"github.com/google/go-cmp/cmp"
+	"github.com/kylelemons/godebug/pretty"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func TestErrTransformer(t *testing.T) {
@@ -100,5 +105,101 @@ func TestIsGRPCPermanent(t *testing.T) {
 	}
 	if got := tr.isGRPCPermanent(codes.PermissionDenied); !got {
 		t.Errorf("isGRPCPermanent(%v): got %v, want %v", codes.PermissionDenied, got, true)
+	}
+}
+
+func TestRespToErr(t *testing.T) {
+	t.Parallel()
+
+	someErr := fmt.Errorf("some error")
+	respHadErr := fmt.Errorf("response error")
+	unexpectedErr := fmt.Errorf("unexpected response")
+
+	tests := []struct {
+		name         string
+		respArg      proto.Message
+		errArg       error
+		protosToErrs []ProtoToErr
+		wantErr      error
+	}{
+		{
+			name:    "Success: error was nil and no transformers",
+			respArg: wrapperspb.String("test"),
+			errArg:  nil,
+			wantErr: nil,
+		},
+		{
+			name:    "Success: transformer returns nil",
+			respArg: wrapperspb.String("test"),
+			errArg:  nil,
+			protosToErrs: []ProtoToErr{
+				func(msg proto.Message) error {
+					return nil
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name:    "Error: incoming error is set, transformers are not run",
+			respArg: wrapperspb.String("test"),
+			errArg:  someErr,
+			protosToErrs: []ProtoToErr{
+				func(msg proto.Message) error {
+					return unexpectedErr
+				},
+			},
+			wantErr: someErr,
+		},
+		{
+			name:    "Error: single transformer returns an error",
+			respArg: wrapperspb.String("test"),
+			errArg:  nil,
+			protosToErrs: []ProtoToErr{
+				func(msg proto.Message) error {
+					return respHadErr
+				},
+			},
+			wantErr: respHadErr,
+		},
+		{
+			name:    "Error: two transformers fire and both errors are accumulated",
+			respArg: wrapperspb.String("test"),
+			errArg:  nil,
+			protosToErrs: []ProtoToErr{
+				func(msg proto.Message) error {
+					return respHadErr
+				},
+				func(msg proto.Message) error {
+					return unexpectedErr
+				},
+			},
+			wantErr: fmt.Errorf("%w: %w", respHadErr, unexpectedErr),
+		},
+		{
+			name:    "Error: first transformer is permanent so the second is not run",
+			respArg: wrapperspb.String("test"),
+			errArg:  nil,
+			protosToErrs: []ProtoToErr{
+				func(msg proto.Message) error {
+					return fmt.Errorf("%w: %w", someErr, errors.ErrPermanent)
+				},
+				func(msg proto.Message) error {
+					return unexpectedErr
+				},
+			},
+			wantErr: fmt.Errorf("%w: %w", someErr, errors.ErrPermanent),
+		},
+	}
+
+	for _, test := range tests {
+		tr := &Transformer{protosToErrs: test.protosToErrs}
+		gotResp, gotErr := tr.RespToErr(test.respArg, test.errArg)
+		if diff := cmp.Diff(test.respArg, gotResp, protocmp.Transform()); diff != "" {
+			t.Errorf("TestRespToErr(%s): response -want/+got:\n%s", test.name, diff)
+			continue
+		}
+		if diff := pretty.Compare(test.wantErr, gotErr); diff != "" {
+			t.Errorf("TestRespToErr(%s): error -want/+got:\n%s", test.name, diff)
+		}
 	}
 }
